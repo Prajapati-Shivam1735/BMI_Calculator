@@ -230,15 +230,15 @@ def show_home():
         save_bmi(username, weight, height, bmi, category, unit_system)
         messagebox.showinfo("Saved", f"BMI saved for {username}.")
 
-    ttk.Button(button_frame, text="✅ Calculate BMI", bootstyle=SUCCESS, width=20, command=on_calculate).pack(pady=10)
-    ttk.Button(button_frame, text="📜 View History", bootstyle=INFO, width=20,
+    ttk.Button(button_frame, text=" Calculate BMI", bootstyle=SUCCESS, width=20, command=on_calculate).pack(pady=10)
+    ttk.Button(button_frame, text=" View History", bootstyle=INFO, width=20,
                command=lambda: show_history(username_entry.get().strip())).pack(pady=10)
 
 def show_history(username):
     highlight_button(history_btn)
     clear_main_frame()
 
-    ttk.Label(main_frame, text="📜 BMI History", font=("Segoe UI", 18, "bold")).pack(pady=10)
+    ttk.Label(main_frame, text=" BMI History", font=("Segoe UI", 18, "bold")).pack(pady=10)
 
     # All users view
     if not username:
@@ -278,11 +278,11 @@ def show_history(username):
 
     btn_frame = ttk.Frame(main_frame)
     btn_frame.pack(pady=10)
-    ttk.Button(btn_frame, text="📊 Show Trend", bootstyle=INFO,
+    ttk.Button(btn_frame, text=" Show Trend", bootstyle=INFO,
                command=lambda: plot_trend(username, records)).pack(side=LEFT, padx=5)
-    ttk.Button(btn_frame, text="🗑️ Delete Selected", bootstyle=WARNING,
+    ttk.Button(btn_frame, text=" Delete Selected", bootstyle=WARNING,
                command=lambda: delete_selected_record(tree, username)).pack(side=LEFT, padx=5)
-    ttk.Button(btn_frame, text="🗑️ Delete All", bootstyle=DANGER,
+    ttk.Button(btn_frame, text=" Delete All", bootstyle=DANGER,
                command=lambda: delete_all_records(username)).pack(side=LEFT, padx=5)
 
 def plot_trend(username, records):
@@ -305,21 +305,21 @@ def plot_trend(username, records):
     plt.show()
 
 # ---------------- Sidebar Buttons ----------------
-home_btn = ttk.Button(sidebar, text="🏠 Home", width=25, command=show_home)
+home_btn = ttk.Button(sidebar, text="Home", width=25, command=show_home)
 home_btn.pack(pady=10, padx=10)
 
-history_btn = ttk.Button(sidebar, text="📜 History", width=25, command=lambda: show_history(""))
+history_btn = ttk.Button(sidebar, text=" History", width=25, command=lambda: show_history(""))
 history_btn.pack(pady=10, padx=10)
 
-settings_btn = ttk.Button(sidebar, text="⚙️ Settings", width=25,
+settings_btn = ttk.Button(sidebar, text=" Settings", width=25,
                            command=lambda: messagebox.showinfo("Settings", "Feature coming soon!"))
 settings_btn.pack(pady=10, padx=10)
 
-theme_btn = ttk.Button(sidebar, text="🌗 Toggle Light/Dark", width=25,
+theme_btn = ttk.Button(sidebar, text=" Toggle Light/Dark", width=25,
                         command=lambda: [highlight_button(theme_btn), toggle_theme()])
 theme_btn.pack(pady=10, padx=10)
 
-exit_btn = ttk.Button(sidebar, text="❌ Exit", width=25, command=root.quit)
+exit_btn = ttk.Button(sidebar, text=" Exit", width=25, command=root.quit)
 exit_btn.pack(pady=10, padx=10)
 
 # Start on home
