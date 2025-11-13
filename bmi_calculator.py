@@ -80,7 +80,7 @@ def fetch_average_bmi():
 
 # ---------------- GUI Setup ----------------
 root = tb.Window(themename="cyborg")
-root.title("BMI Dashboard")
+root.title("BMI Calculator")
 root.geometry("1250x750")
 
 # Sidebar
