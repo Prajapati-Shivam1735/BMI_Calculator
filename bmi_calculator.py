@@ -81,14 +81,14 @@ def fetch_average_bmi():
 # ---------------- GUI Setup ----------------
 root = tb.Window(themename="cyborg")
 root.title("BMI Dashboard")
-root.geometry("950x550")
+root.geometry("1250x750")
 
 # Sidebar
 sidebar = ttk.Frame(root, bootstyle=SECONDARY)
 sidebar.pack(side=LEFT, fill=Y)
 
 menu_label = ttk.Label(sidebar, text=" BMI Dashboard", bootstyle=INVERSE, font=("Segoe UI", 14, "bold"))
-menu_label.pack(pady=20)
+menu_label.pack(pady=15)
 
 current_theme = "cyborg"
 def toggle_theme():
@@ -137,27 +137,34 @@ def delete_selected_record(tree, username):
     show_history(username)
 
 def delete_all_records(username):
-    """Delete all BMI records for a user (confirmation required)."""
+    """Delete all BMI records for the current user (confirmation shown inside main window)."""
+    if not username:
+        messagebox.showwarning("No Username", "Please provide a username to delete records.")
+        return
+
+    # Ask first confirmation
     confirm = messagebox.askyesno("Confirm Delete", f"Are you sure you want to delete ALL records for '{username}'?")
     if not confirm:
         return
 
-    confirm_window = tb.Toplevel(root)
-    confirm_window.title("Confirm Username")
-    confirm_window.geometry("330x180")
-    confirm_window.resizable(False, False)
-    confirm_window.grab_set()
+    # Clear the main frame to show inline confirmation UI
+    clear_main_frame()
 
-    bg_color = "#121212" if current_theme == "cyborg" else "white"
-    fg_color = "white" if current_theme == "cyborg" else "black"
-    confirm_window.configure(bg=bg_color)
+    # --- Inline Confirmation UI ---
+    title = ttk.Label(main_frame, text=f"⚠️ Confirm Deletion for '{username}'", font=("Segoe UI", 18, "bold"))
+    title.pack(pady=15)
 
-    ttk.Label(confirm_window, text=f"Type '{username}' to confirm:",
-              font=("Segoe UI", 11, "bold"), background=bg_color, foreground=fg_color).pack(pady=10)
-    entry = ttk.Entry(confirm_window, width=25)
+    ttk.Label(main_frame, text=f"Type '{username}' below to confirm deletion of all records:",
+              font=("Segoe UI", 11)).pack(pady=10)
+
+    entry = ttk.Entry(main_frame, width=30)
     entry.pack(pady=5)
 
+    result_label = ttk.Label(main_frame, text="", font=("Segoe UI", 10))
+    result_label.pack(pady=5)
+
     def confirm_delete_action():
+        """Perform deletion if username matches."""
         if entry.get().strip() == username:
             conn = get_db_connection()
             cur = conn.cursor()
@@ -165,17 +172,24 @@ def delete_all_records(username):
             conn.commit()
             cur.close()
             conn.close()
-            messagebox.showinfo("Deleted", f"All records for {username} deleted.")
-            confirm_window.destroy()
-            show_history(username)
-        else:
-            messagebox.showerror("Mismatch", "Username does not match. Deletion cancelled.")
-            confirm_window.destroy()
 
-    btn_frame = ttk.Frame(confirm_window)
-    btn_frame.pack(pady=10)
-    ttk.Button(btn_frame, text="Confirm Delete", bootstyle=DANGER, command=confirm_delete_action).pack(side=LEFT, padx=5)
-    ttk.Button(btn_frame, text="Cancel", bootstyle=SECONDARY, command=confirm_window.destroy).pack(side=LEFT, padx=5)
+            result_label.config(text=f"✅ All records for '{username}' deleted successfully.",
+                                foreground="limegreen")
+            # Refresh after short delay
+            main_frame.after(1500, lambda: show_history(username))
+        else:
+            result_label.config(text="❌ Username does not match. Deletion cancelled.",
+                                foreground="red")
+
+    # --- Button Frame ---
+    btn_frame = ttk.Frame(main_frame)
+    btn_frame.pack(pady=15)
+
+    ttk.Button(btn_frame, text="🗑️ Confirm Delete", bootstyle=DANGER, width=18,
+               command=confirm_delete_action).pack(side=LEFT, padx=8)
+    ttk.Button(btn_frame, text="↩️ Cancel", bootstyle=SECONDARY, width=18,
+               command=lambda: show_history(username)).pack(side=LEFT, padx=8)
+
 
 # ---------------- Views ----------------
 def clear_main_frame():
