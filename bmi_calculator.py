@@ -1,11 +1,12 @@
 import tkinter as tk
-from tkinter import messagebox, ttk
+from tkinter import ttk, messagebox
+import ttkbootstrap as tb
+from ttkbootstrap.constants import *
 import mysql.connector
 from datetime import datetime
 import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
 
-# =========== Database Connection ===========
+# ---------------- Database Connection ----------------
 def get_db_connection():
     return mysql.connector.connect(
         host="localhost",
@@ -14,230 +15,313 @@ def get_db_connection():
         database="bmi_calc"
     )
 
-# =========== BMI Calculation ===========
+# ---------------- BMI Logic ----------------
 def calculate_bmi(weight, height, unit_system):
-    """Calculate BMI in metric (kg/m) or imperial (lbs/in)."""
-    if unit_system == "Metric":
-        return weight / (height ** 2)
-    else:  # Imperial
-        return (weight / (height ** 2)) * 703.0  # lbs/inches²
+    """Calculate BMI in metric or imperial units."""
+    return (weight / height ** 2) if unit_system == "Metric" else (weight / height ** 2) * 703
 
 def classify_bmi(bmi):
-    """Return BMI category."""
+    """Classify BMI category."""
     if bmi < 18.5:
         return "Underweight"
-    elif 18.5 <= bmi < 25.0:
+    elif bmi < 25:
         return "Normal weight"
-    elif 25.0 <= bmi < 30.0:
+    elif bmi < 30:
         return "Overweight"
     else:
         return "Obesity"
 
-# ============ Database Functions ============
 def save_bmi(username, weight, height, bmi, category, unit_system):
-    try:
-        conn = get_db_connection()
-        cur = conn.cursor()
-        cur.execute("""
-            INSERT INTO bmi_records (username, weight, height, bmi, category, unit_system, date)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
-        """, (username, weight, height, bmi, category, unit_system, datetime.now()))
-        conn.commit()
-        cur.close()
-        conn.close()
-    except mysql.connector.Error as err:
-        messagebox.showerror("Database Error", f"Error saving BMI record: {err}")
+    """Save BMI record to database."""
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("""
+        INSERT INTO bmi_records (username, weight, height, bmi, category, unit_system, date)
+        VALUES (%s,%s,%s,%s,%s,%s,%s)
+    """, (username, weight, height, bmi, category, unit_system, datetime.now()))
+    conn.commit()
+    cur.close()
+    conn.close()
 
 def fetch_user_history(username):
-    try:
-        conn = get_db_connection()
-        cur = conn.cursor()
-        cur.execute("SELECT date, bmi, category FROM bmi_records WHERE username=%s ORDER BY date ASC", (username,))
-        rows = cur.fetchall()
-        cur.close()
-        conn.close()
-        return rows
-    except mysql.connector.Error as err:
-        messagebox.showerror("Database Error", f"Error fetching history: {err}")
-        return []
+    """Fetch BMI records for a specific user."""
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT id, date, bmi, category FROM bmi_records WHERE username=%s ORDER BY date ASC", (username,))
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+    return rows
+
+def fetch_all_history():
+    """Fetch all BMI records for all users."""
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT username, date, bmi, category FROM bmi_records ORDER BY username ASC, date ASC")
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+    return rows
 
 def fetch_average_bmi():
-    try:
-        conn = get_db_connection()
-        cur = conn.cursor()
-        cur.execute("""
-            SELECT DATE(date) as day, AVG(bmi) as avg_bmi
-            FROM bmi_records
-            GROUP BY DATE(date)
-            ORDER BY DATE(date)
-        """)
-        rows = cur.fetchall()
-        cur.close()
-        conn.close()
-        return rows
-    except mysql.connector.Error as err:
-        messagebox.showerror("Database Error", f"Error fetching averages: {err}")
-        return []
+    """Fetch average BMI per day."""
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT DATE(date), AVG(bmi)
+        FROM bmi_records
+        GROUP BY DATE(date)
+        ORDER BY DATE(date)
+    """)
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+    return rows
 
-# ============ GUI Functions ============
-def on_calculate():
-    username = username_entry.get().strip()
-    unit_system = unit_var.get()
+# ---------------- GUI Setup ----------------
+root = tb.Window(themename="cyborg")
+root.title("BMI Dashboard")
+root.geometry("950x550")
 
-    # parse numeric entries
-    try:
-        weight = float(weight_entry.get())
-        height = float(height_entry.get())
-    except ValueError:
-        messagebox.showerror("Invalid Input", "Weight and height must be numeric.")
+# Sidebar
+sidebar = ttk.Frame(root, bootstyle=SECONDARY)
+sidebar.pack(side=LEFT, fill=Y)
+
+menu_label = ttk.Label(sidebar, text=" BMI Dashboard", bootstyle=INVERSE, font=("Segoe UI", 14, "bold"))
+menu_label.pack(pady=20)
+
+current_theme = "cyborg"
+def toggle_theme():
+    global current_theme
+    new_theme = "flatly" if current_theme == "cyborg" else "cyborg"
+    root.style.theme_use(new_theme)
+    current_theme = new_theme
+    # Adjust label color
+    menu_label.configure(foreground="black" if new_theme == "cyborg" else "#0d6efd")
+
+def highlight_button(active_btn):
+    for btn in sidebar.winfo_children():
+        if isinstance(btn, ttk.Button):
+            btn.configure(bootstyle=SECONDARY)
+    active_btn.configure(bootstyle=INFO)
+
+# Main frame
+main_frame = ttk.Frame(root, padding=30)
+main_frame.pack(fill=BOTH, expand=True)
+
+# ---------------- Delete Logic ----------------
+def delete_selected_record(tree, username):
+    """Delete selected BMI record for logged user."""
+    selected = tree.selection()
+    if not selected:
+        messagebox.showwarning("No selection", "Please select a record to delete.")
         return
 
-    if not username:
-        messagebox.showerror("Missing Info", "Please enter a username.")
+    record = tree.item(selected[0])["values"]
+    if not record:
+        return
+    record_id = record[0]
+
+    confirm = messagebox.askyesno("Confirm Delete", "Delete this record?")
+    if not confirm:
         return
 
-    # validation: use AND so both conditions must be true to pass
-    if unit_system == "Metric":
-        if not (0 < weight < 500 and 0 < height < 3):
-            messagebox.showerror("Invalid Range", "Please enter realistic metric values (kg, meters).")
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM bmi_records WHERE id=%s AND username=%s", (record_id, username))
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    messagebox.showinfo("Deleted", "Record deleted successfully.")
+    show_history(username)
+
+def delete_all_records(username):
+    """Delete all BMI records for a user (confirmation required)."""
+    confirm = messagebox.askyesno("Confirm Delete", f"Are you sure you want to delete ALL records for '{username}'?")
+    if not confirm:
+        return
+
+    confirm_window = tb.Toplevel(root)
+    confirm_window.title("Confirm Username")
+    confirm_window.geometry("330x180")
+    confirm_window.resizable(False, False)
+    confirm_window.grab_set()
+
+    bg_color = "#121212" if current_theme == "cyborg" else "white"
+    fg_color = "white" if current_theme == "cyborg" else "black"
+    confirm_window.configure(bg=bg_color)
+
+    ttk.Label(confirm_window, text=f"Type '{username}' to confirm:",
+              font=("Segoe UI", 11, "bold"), background=bg_color, foreground=fg_color).pack(pady=10)
+    entry = ttk.Entry(confirm_window, width=25)
+    entry.pack(pady=5)
+
+    def confirm_delete_action():
+        if entry.get().strip() == username:
+            conn = get_db_connection()
+            cur = conn.cursor()
+            cur.execute("DELETE FROM bmi_records WHERE username=%s", (username,))
+            conn.commit()
+            cur.close()
+            conn.close()
+            messagebox.showinfo("Deleted", f"All records for {username} deleted.")
+            confirm_window.destroy()
+            show_history(username)
+        else:
+            messagebox.showerror("Mismatch", "Username does not match. Deletion cancelled.")
+            confirm_window.destroy()
+
+    btn_frame = ttk.Frame(confirm_window)
+    btn_frame.pack(pady=10)
+    ttk.Button(btn_frame, text="Confirm Delete", bootstyle=DANGER, command=confirm_delete_action).pack(side=LEFT, padx=5)
+    ttk.Button(btn_frame, text="Cancel", bootstyle=SECONDARY, command=confirm_window.destroy).pack(side=LEFT, padx=5)
+
+# ---------------- Views ----------------
+def clear_main_frame():
+    for widget in main_frame.winfo_children():
+        widget.destroy()
+
+def show_home():
+    highlight_button(home_btn)
+    clear_main_frame()
+
+    ttk.Label(main_frame, text="BMI Calculator", font=("Segoe UI", 20, "bold")).grid(row=0, column=0, columnspan=3, pady=(0, 20))
+
+    ttk.Label(main_frame, text="Username:").grid(row=1, column=0, sticky=E, pady=5)
+    username_entry = ttk.Entry(main_frame, width=25)
+    username_entry.grid(row=1, column=1, pady=5, sticky=W)
+
+    ttk.Label(main_frame, text="Weight:").grid(row=2, column=0, sticky=E, pady=5)
+    weight_entry = ttk.Entry(main_frame, width=25)
+    weight_entry.grid(row=2, column=1, pady=5, sticky=W)
+
+    ttk.Label(main_frame, text="Height:").grid(row=3, column=0, sticky=E, pady=5)
+    height_entry = ttk.Entry(main_frame, width=25)
+    height_entry.grid(row=3, column=1, pady=5, sticky=W)
+
+    unit_var = tk.StringVar(value="Metric")
+    unit_frame = ttk.Frame(main_frame)
+    unit_frame.grid(row=4, column=0, columnspan=2, pady=10, sticky=W)
+    ttk.Radiobutton(unit_frame, text="Metric (kg/m)", variable=unit_var, value="Metric").pack(side=LEFT, padx=10)
+    ttk.Radiobutton(unit_frame, text="Imperial (lbs/in)", variable=unit_var, value="Imperial").pack(side=LEFT, padx=10)
+
+    result_label = ttk.Label(main_frame, text="", font=("Segoe UI", 14, "bold"))
+    result_label.grid(row=5, column=0, columnspan=2, pady=15, sticky=W)
+
+    button_frame = ttk.Frame(main_frame)
+    button_frame.grid(row=1, column=2, rowspan=6, padx=40, sticky="n")
+
+    def on_calculate():
+        username = username_entry.get().strip()
+        if not username:
+            messagebox.showerror("Error", "Enter a username.")
             return
-    else:  # Imperial
-        if not (0 < weight < 1100 and 0 < height < 120):
-            messagebox.showerror("Invalid Range", "Please enter realistic imperial values (lbs, inches).")
+        try:
+            weight = float(weight_entry.get())
+            height = float(height_entry.get())
+        except ValueError:
+            messagebox.showerror("Error", "Invalid input.")
             return
+        unit_system = unit_var.get()
+        bmi = calculate_bmi(weight, height, unit_system)
+        category = classify_bmi(bmi)
+        result_label.config(text=f"{bmi:.2f} ({category})")
+        save_bmi(username, weight, height, bmi, category, unit_system)
+        messagebox.showinfo("Saved", f"BMI saved for {username}.")
 
-    bmi = calculate_bmi(weight, height, unit_system)
-    category = classify_bmi(bmi)
-    result_label.config(text=f"BMI: {bmi:.2f} ({category})")
+    ttk.Button(button_frame, text="✅ Calculate BMI", bootstyle=SUCCESS, width=20, command=on_calculate).pack(pady=10)
+    ttk.Button(button_frame, text="📜 View History", bootstyle=INFO, width=20,
+               command=lambda: show_history(username_entry.get().strip())).pack(pady=10)
 
-    save_bmi(username, weight, height, bmi, category, unit_system)
-    messagebox.showinfo("Saved", f"Record saved for {username}")
+def show_history(username):
+    highlight_button(history_btn)
+    clear_main_frame()
 
-def on_view_history():
-    username = username_entry.get().strip()
+    ttk.Label(main_frame, text="📜 BMI History", font=("Segoe UI", 18, "bold")).pack(pady=10)
+
+    # All users view
     if not username:
-        messagebox.showerror("Missing Info", "Enter a username to view history.")
+        records = fetch_all_history()
+        if not records:
+            ttk.Label(main_frame, text="No records found.", font=("Segoe UI", 12)).pack(pady=20)
+            return
+        columns = ("Username", "Date", "BMI", "Category")
+        tree = ttk.Treeview(main_frame, columns=columns, show="headings", height=12)
+        for c in columns:
+            tree.heading(c, text=c)
+            tree.column(c, anchor="center", width=200)
+        current_user = None
+        for user, d, b, cat in records:
+            if user != current_user:
+                tree.insert("", "end", values=(f"--- {user} ---", "", "", ""))
+                current_user = user
+            tree.insert("", "end", values=(user, d.strftime("%Y-%m-%d %H:%M"), f"{b:.2f}", cat))
+        tree.pack(fill=BOTH, expand=True, padx=10, pady=10)
         return
 
+    # Personal user history
     records = fetch_user_history(username)
     if not records:
-        messagebox.showinfo("No Data", f"No records found for {username}.")
+        ttk.Label(main_frame, text=f"No records found for '{username}'.", font=("Segoe UI", 12)).pack(pady=20)
         return
 
-    hist_win = tk.Toplevel(root)
-    hist_win.title(f"{username}'s BMI History")
-    hist_win.geometry("500x350")
+    columns = ("ID", "Date", "BMI", "Category")
+    tree = ttk.Treeview(main_frame, columns=columns, show="headings", height=10)
+    for c in columns:
+        tree.heading(c, text=c)
+        width = 80 if c == "ID" else 200
+        tree.column(c, anchor="center", width=width)
+    for rec in records:
+        tree.insert("", "end", values=(rec[0], rec[1].strftime("%Y-%m-%d %H:%M"), f"{rec[2]:.2f}", rec[3]))
+    tree.pack(fill=BOTH, expand=True, padx=10, pady=10)
 
-    tree = ttk.Treeview(hist_win, columns=("Date", "BMI", "Category"), show="headings")
-    tree.heading("Date", text="Date")
-    tree.heading("BMI", text="BMI")
-    tree.heading("Category", text="Category")
-    tree.column("Date", width=180)
-    tree.column("BMI", width=80, anchor="center")
-    tree.column("Category", width=120, anchor="center")
-
-    for row in records:
-        # row[0] is a datetime or string; format nicely
-        if isinstance(row[0], datetime):
-            date_str = row[0].strftime("%Y-%m-%d %H:%M:%S")
-        else:
-            date_str = str(row[0])
-        tree.insert("", "end", values=(date_str, f"{row[1]:.2f}", row[2]))
-
-    tree.pack(fill=tk.BOTH, expand=True, padx=8, pady=8)
-
-    ttk.Button(hist_win, text="Show BMI Trend", command=lambda: plot_trend(username, records)).pack(pady=6)
+    btn_frame = ttk.Frame(main_frame)
+    btn_frame.pack(pady=10)
+    ttk.Button(btn_frame, text="📊 Show Trend", bootstyle=INFO,
+               command=lambda: plot_trend(username, records)).pack(side=LEFT, padx=5)
+    ttk.Button(btn_frame, text="🗑️ Delete Selected", bootstyle=WARNING,
+               command=lambda: delete_selected_record(tree, username)).pack(side=LEFT, padx=5)
+    ttk.Button(btn_frame, text="🗑️ Delete All", bootstyle=DANGER,
+               command=lambda: delete_all_records(username)).pack(side=LEFT, padx=5)
 
 def plot_trend(username, records):
-    # convert user records to date/datetime and floats
-    user_dates = []
-    user_bmis = []
-    for r in records:
-        d = r[0]
-        if isinstance(d, datetime):
-            dt = d
-        else:
-            # MySQL connector typically returns datetime objects, but guard here
-            try:
-                dt = datetime.strptime(str(d), "%Y-%m-%d %H:%M:%S")
-            except Exception:
-                # fallback try date-only format
-                try:
-                    dt = datetime.strptime(str(d), "%Y-%m-%d")
-                except Exception:
-                    continue
-        user_dates.append(dt)
-        user_bmis.append(float(r[1]))
-
+    user_dates = [r[1] for r in records]
+    user_bmis = [r[2] for r in records]
     avg_records = fetch_average_bmi()
-    avg_dates = []
-    avg_bmis = []
-    for r in avg_records:
-        # r[0] is DATE (YYYY-MM-DD), r[1] is avg_bmi
-        try:
-            dt = datetime.strptime(str(r[0]), "%Y-%m-%d")
-            avg_dates.append(dt)
-            avg_bmis.append(float(r[1]))
-        except Exception:
-            continue
+    avg_dates = [r[0] for r in avg_records]
+    avg_bmis = [r[1] for r in avg_records]
 
-    if not user_dates:
-        messagebox.showinfo("No Data", "No plottable user data.")
-        return
-
-    plt.figure(figsize=(9, 5))
-    plt.plot(user_dates, user_bmis, marker='o', label=f"{username}'s BMI")
-    if avg_dates and avg_bmis:
-        plt.plot(avg_dates, avg_bmis, linestyle='--', marker='s', label='Daily Average BMI')
-
+    plt.figure(figsize=(8, 4))
+    plt.plot(user_dates, user_bmis, marker="o", label=f"{username}'s BMI")
+    if avg_records:
+        plt.plot(avg_dates, avg_bmis, linestyle="--", label="Average BMI", color="orange")
     plt.title(f"BMI Trend for {username}")
     plt.xlabel("Date")
     plt.ylabel("BMI")
-    plt.gca().xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m-%d"))
-    plt.gca().xaxis.set_major_locator(mdates.AutoDateLocator())
     plt.xticks(rotation=45, ha="right")
     plt.legend()
-    plt.grid(True)
     plt.tight_layout()
     plt.show()
 
-# ============ Main GUI Setup ============
-root = tk.Tk()
-root.title("BMI Calculator")
-root.geometry("420x520")
-root.resizable(False, False)
+# ---------------- Sidebar Buttons ----------------
+home_btn = ttk.Button(sidebar, text="🏠 Home", width=25, command=show_home)
+home_btn.pack(pady=10, padx=10)
 
-title_label = tk.Label(root, text="BMI Calculator", font=("Arial", 16, "bold"))
-title_label.pack(pady=10)
+history_btn = ttk.Button(sidebar, text="📜 History", width=25, command=lambda: show_history(""))
+history_btn.pack(pady=10, padx=10)
 
-# username
-tk.Label(root, text="Username:").pack()
-username_entry = tk.Entry(root, width=30)
-username_entry.pack(pady=5)
+settings_btn = ttk.Button(sidebar, text="⚙️ Settings", width=25,
+                           command=lambda: messagebox.showinfo("Settings", "Feature coming soon!"))
+settings_btn.pack(pady=10, padx=10)
 
-# weight & height
-tk.Label(root, text="Weight:").pack()
-weight_entry = tk.Entry(root, width=30)
-weight_entry.pack(pady=5)
+theme_btn = ttk.Button(sidebar, text="🌗 Toggle Light/Dark", width=25,
+                        command=lambda: [highlight_button(theme_btn), toggle_theme()])
+theme_btn.pack(pady=10, padx=10)
 
-tk.Label(root, text="Height:").pack()
-height_entry = tk.Entry(root, width=30)
-height_entry.pack(pady=5)
+exit_btn = ttk.Button(sidebar, text="❌ Exit", width=25, command=root.quit)
+exit_btn.pack(pady=10, padx=10)
 
-# unit system
-unit_var = tk.StringVar(value="Metric")
-unit_frame = tk.Frame(root)
-unit_frame.pack(pady=5)
-tk.Label(unit_frame, text="Unit System:").pack(side=tk.LEFT, padx=5)
-tk.Radiobutton(unit_frame, text="Metric (kg / m)", variable=unit_var, value="Metric").pack(side=tk.LEFT, padx=6)
-tk.Radiobutton(unit_frame, text="Imperial (lbs / in)", variable=unit_var, value="Imperial").pack(side=tk.LEFT, padx=6)
-
-# buttons
-ttk.Button(root, text="Calculate BMI", command=on_calculate).pack(pady=12)
-result_label = tk.Label(root, text="", font=("Arial", 12, "bold"), fg="blue")
-result_label.pack(pady=6)
-
-ttk.Button(root, text="View History", command=on_view_history).pack(pady=6)
-ttk.Button(root, text="Exit", command=root.quit).pack(pady=6)
-
+# Start on home
+show_home()
 root.mainloop()
