@@ -200,30 +200,35 @@ def show_home():
     highlight_button(home_btn)
     clear_main_frame()
 
-    ttk.Label(main_frame, text="BMI Calculator", font=("Segoe UI", 20, "bold")).grid(row=0, column=0, columnspan=3, pady=(0, 20))
+    # Create a wrapper frame to center everything vertically
+    content_frame = ttk.Frame(main_frame)
+    content_frame.place(relx=0.5, rely=0.45, anchor="center")  # Centered horizontally + slightly above true center
 
-    ttk.Label(main_frame, text="Username:").grid(row=1, column=0, sticky=E, pady=5)
-    username_entry = ttk.Entry(main_frame, width=25)
-    username_entry.grid(row=1, column=1, pady=5, sticky=W)
+    ttk.Label(content_frame, text="BMI Calculator", font=("Segoe UI", 22, "bold")).grid(row=0, column=0, columnspan=3, pady=(0, 25))
 
-    ttk.Label(main_frame, text="Weight:").grid(row=2, column=0, sticky=E, pady=5)
-    weight_entry = ttk.Entry(main_frame, width=25)
-    weight_entry.grid(row=2, column=1, pady=5, sticky=W)
+    ttk.Label(content_frame, text="Username:", font=("Segoe UI", 15)).grid(row=1, column=0, sticky=E, pady=5)
+    username_entry = ttk.Entry(content_frame, width=25)
+    username_entry.grid(row=1, column=1, pady=5,padx=5, sticky=W)
 
-    ttk.Label(main_frame, text="Height:").grid(row=3, column=0, sticky=E, pady=5)
-    height_entry = ttk.Entry(main_frame, width=25)
-    height_entry.grid(row=3, column=1, pady=5, sticky=W)
+    ttk.Label(content_frame, text="Weight:", font=("Segoe UI", 15)).grid(row=2, column=0, sticky=E, pady=5)
+    weight_entry = ttk.Entry(content_frame, width=25)
+    weight_entry.grid(row=2, column=1, pady=5,padx=5, sticky=W)
+
+    ttk.Label(content_frame, text="Height:", font=("Segoe UI", 15)).grid(row=3, column=0, sticky=E, pady=5)
+    height_entry = ttk.Entry(content_frame, width=25)
+    height_entry.grid(row=3, column=1, pady=5,padx=5, sticky=W)
 
     unit_var = tk.StringVar(value="Metric")
-    unit_frame = ttk.Frame(main_frame)
-    unit_frame.grid(row=4, column=0, columnspan=2, pady=10, sticky=W)
+    unit_frame = ttk.Frame(content_frame)
+    unit_frame.grid(row=4, column=0, columnspan=2, pady=15, sticky=W)
     ttk.Radiobutton(unit_frame, text="Metric (kg/m)", variable=unit_var, value="Metric").pack(side=LEFT, padx=10)
-    ttk.Radiobutton(unit_frame, text="Imperial (lbs/in)", variable=unit_var, value="Imperial").pack(side=LEFT, padx=10)
+    ttk.Radiobutton(unit_frame, text="Imperial (lbs/in)", variable=unit_var, value="Imperial").pack(side=LEFT, padx=15)
 
-    result_label = ttk.Label(main_frame, text="", font=("Segoe UI", 14, "bold"))
+    result_label = ttk.Label(content_frame, text="", font=("Segoe UI", 14, "bold"))
     result_label.grid(row=5, column=0, columnspan=2, pady=15, sticky=W)
 
-    button_frame = ttk.Frame(main_frame)
+    # Right-side buttons
+    button_frame = ttk.Frame(content_frame)
     button_frame.grid(row=1, column=2, rowspan=6, padx=40, sticky="n")
 
     def on_calculate():
@@ -244,9 +249,10 @@ def show_home():
         save_bmi(username, weight, height, bmi, category, unit_system)
         messagebox.showinfo("Saved", f"BMI saved for {username}.")
 
-    ttk.Button(button_frame, text=" Calculate BMI", bootstyle=SUCCESS, width=20, command=on_calculate).pack(pady=10)
-    ttk.Button(button_frame, text=" View History", bootstyle=INFO, width=20,
+    ttk.Button(button_frame, text="Calculate BMI", bootstyle=SUCCESS, width=20, command=on_calculate).pack(pady=10)
+    ttk.Button(button_frame, text="View History", bootstyle=INFO, width=20,
                command=lambda: show_history(username_entry.get().strip())).pack(pady=10)
+
 
 def show_history(username):
     highlight_button(history_btn)
@@ -325,11 +331,11 @@ home_btn.pack(pady=10, padx=10)
 history_btn = ttk.Button(sidebar, text=" History", width=25, command=lambda: show_history(""))
 history_btn.pack(pady=10, padx=10)
 
-settings_btn = ttk.Button(sidebar, text=" Settings", width=25,
-                           command=lambda: messagebox.showinfo("Settings", "Feature coming soon!"))
-settings_btn.pack(pady=10, padx=10)
+# settings_btn = ttk.Button(sidebar, text=" Settings", width=25,
+#                            command=lambda: messagebox.showinfo("Settings", "Feature coming soon!"))
+# settings_btn.pack(pady=10, padx=10)
 
-theme_btn = ttk.Button(sidebar, text=" Toggle Light/Dark", width=25,
+theme_btn = ttk.Button(sidebar, text=" Theme Light/Dark", width=25,
                         command=lambda: [highlight_button(theme_btn), toggle_theme()])
 theme_btn.pack(pady=10, padx=10)
 
